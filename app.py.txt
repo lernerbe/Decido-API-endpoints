@@ -1,0 +1,47 @@
+from fastapi import APIRouter, HTTPException, Query, Depends, status
+from typing import Optional, List, Annotated
+from psycopg2.extras import RealDictCursor
+import pandas as pd
+from psycopg2 import connect
+from contextlib import contextmanager
+from fastapi.responses import JSONResponse
+# from models import Page  # Import the Page model
+
+# Database connection configuration
+client_connection = {
+    'user': 'bennyl',
+    'host': '34.122.231.128',
+    'database': 'platform_staging',
+    'password': 'R11w0LYdp0YfdHEe',
+    'port': 5432
+}
+
+@contextmanager
+def get_client_connection(client_connection):
+    connection = connect(**client_connection)
+    try:
+        print("connection successful")
+        yield connection
+    finally:
+        connection.close()
+
+@contextmanager
+def get_cursor(connection):
+    with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+        try:
+            yield cursor
+        finally:
+            cursor.close()
+
+def exec_query(sql, binds=None, commit=True, return_data=False):
+    try:
+        with get_client_connection(client_connection) as conn:
+            with get_cursor(conn) as cursor:
+                cursor.execute(sql, binds)
+                if return_data:
+                    return pd.DataFrame(cursor.fetchall())
+                if commit:
+                    conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error in exec_query: {e}")
